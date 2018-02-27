@@ -50,7 +50,7 @@ import (
 
 	"crypto/tls"
 
-	web "github.com/dutchcoders/transfer.sh-web"
+	web "github.com/mrizvic/transfer.sh-web"
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 
 	autocert "golang.org/x/crypto/acme/autocert"
@@ -72,6 +72,12 @@ func ClamavHost(s string) OptionFn {
 func VirustotalKey(s string) OptionFn {
 	return func(srvr *Server) {
 		srvr.VirusTotalKey = s
+	}
+}
+
+func AuthenticateUploads(key string) OptionFn {
+	return func(srvr *Server) {
+		srvr.AuthKey = key
 	}
 }
 
@@ -189,6 +195,7 @@ type Server struct {
 	locks map[string]*sync.Mutex
 
 	rateLimitRequests int
+	AuthKey string
 
 	storage Storage
 
@@ -311,16 +318,18 @@ func (s *Server) Run() {
 		getHandlerFn = ratelimit.Request(ratelimit.IP).Rate(s.rateLimitRequests, 60*time.Second).LimitBy(memory.New())(http.HandlerFunc(getHandlerFn)).ServeHTTP
 	}
 
+	r.HandleFunc("/{token}/{filename}", s.AuthenticatedHandler (http.HandlerFunc (s.deleteHandler))).Methods("DELETE")
+
 	r.HandleFunc("/{token}/{filename}", getHandlerFn).Methods("GET")
 	r.HandleFunc("/get/{token}/{filename}", getHandlerFn).Methods("GET")
 	r.HandleFunc("/download/{token}/{filename}", getHandlerFn).Methods("GET")
 
 	r.HandleFunc("/{filename}/virustotal", s.virusTotalHandler).Methods("PUT")
 	r.HandleFunc("/{filename}/scan", s.scanHandler).Methods("PUT")
-	r.HandleFunc("/put/{filename}", s.putHandler).Methods("PUT")
-	r.HandleFunc("/upload/{filename}", s.putHandler).Methods("PUT")
-	r.HandleFunc("/{filename}", s.putHandler).Methods("PUT")
-	r.HandleFunc("/", s.postHandler).Methods("POST")
+	r.HandleFunc("/put/{filename}", s.AuthenticatedHandler (http.HandlerFunc (s.putHandler))).Methods("PUT")
+	r.HandleFunc("/upload/{filename}", s.AuthenticatedHandler (http.HandlerFunc (s.putHandler))).Methods("PUT")
+	r.HandleFunc("/{filename}", s.AuthenticatedHandler (http.HandlerFunc (s.putHandler))).Methods("PUT")
+	r.HandleFunc("/", s.AuthenticatedHandler (http.HandlerFunc (s.postHandler))).Methods("POST")
 	// r.HandleFunc("/{page}", viewHandler).Methods("GET")
 
 	r.NotFoundHandler = http.HandlerFunc(s.notFoundHandler)

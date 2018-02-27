@@ -7,7 +7,7 @@ import (
 
 	"strings"
 
-	"github.com/dutchcoders/transfer.sh/server"
+	"github.com/mrizvic/transfer.sh/server"
 	"github.com/fatih/color"
 	"github.com/minio/cli"
 )
@@ -139,6 +139,12 @@ var globalFlags = []cli.Flag{
 		Name:  "profiler",
 		Usage: "enable profiling",
 	},
+	cli.StringFlag{
+		Name:   "auth-key",
+		Usage:  "auth-key",
+		Value:  "",
+		EnvVar: "AUTH_KEY",
+	},
 }
 
 type Cmd struct {
@@ -196,6 +202,10 @@ func New() *Cmd {
 
 		if v := c.String("virustotal-key"); v != "" {
 			options = append(options, server.VirustotalKey(v))
+		}
+
+		if v := c.String("auth-key"); v != "" {
+			options = append(options, server.AuthenticateUploads(v))
 		}
 
 		if v := c.String("clamav-host"); v != "" {
